@@ -114,6 +114,16 @@ jobs:
             (echo "::warning::twrp-depmod still present in kernel.mk"; grep -n -B2 -A2 "twrp-depmod" vendor/twrp/build/tasks/kernel.mk) || \
             echo "patched: stale depmod call removed"
 
+      # TeamWin system/vold android-14.1 regressed the fscrypt_policy API in
+      # 2022: the union fscrypt_policy type and get_policy_size() helpers that
+      # libtar (android-14.1 recovery) calls were removed. Restore them from
+      # the android-12.1 branch (still the latest working API).
+      - name: Patch system/vold fscrypt API (upstream regression)
+        run: |
+          cd workspace
+          python3 ${{ env.DEVICE_PATH }}/patch-vold-fscrypt.py
+          echo "patched: vold fscrypt union API restored"
+
       - name: Download latest kernel release (boot-main.img)
         run: |
           RELEASE_URL=$(curl -s "https://api.github.com/repos/${{ env.KERNEL_REPO }}/releases/latest" | grep -oP '"browser_download_url": "\K[^"]*boot-main\.img' | head -1)
