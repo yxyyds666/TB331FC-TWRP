@@ -151,12 +151,15 @@ jobs:
             android.security.authorization-ndk_platform
             android.security.maintenance-ndk_platform
           )
-          for lib in "${MISSING_LIBS[@]}"; do
-            LIB_DIR="${PRODUCT_OUT}/obj/SHARED_LIBRARIES/${lib}_intermediates"
-            mkdir -p "$LIB_DIR"
-            touch "${LIB_DIR}/${lib}.so"
-            touch "${LIB_DIR}/${lib}.so.toc"
-            echo "Created stub for ${lib}"
+          # 64-bit (obj) and 32-bit (obj_arm) variants both need stubs
+          for ARCH_DIR in obj obj_arm; do
+            for lib in "${MISSING_LIBS[@]}"; do
+              LIB_DIR="${PRODUCT_OUT}/${ARCH_DIR}/SHARED_LIBRARIES/${lib}_intermediates"
+              mkdir -p "$LIB_DIR"
+              touch "${LIB_DIR}/${lib}.so"
+              touch "${LIB_DIR}/${lib}.so.toc"
+              echo "Created stub for ${ARCH_DIR}/${lib}"
+            done
           done
         working-directory: workspace
 
