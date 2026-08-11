@@ -45,7 +45,7 @@ jobs:
       - name: Install mkbootimg
         run: |
           mkdir -p /tmp/boottools
-          curl -sL -o /tmp/boottools/unpack_bootimg.py https://raw.githubusercontent.com/osm0sis/mkbootimg/master/unpack_bootimg.py
+          curl -sL -o /tmp/boottools/unpack_bootimg.py https://raw.githubusercontent.com/LineageOS/android_system_tools_mkbootimg/lineage-22.1/unpack_bootimg.py
           chmod +x /tmp/boottools/unpack_bootimg.py
           sudo ln -sf /tmp/boottools/unpack_bootimg.py /usr/local/bin/unpack_bootimg
           unpack_bootimg --help
