@@ -91,7 +91,23 @@ jobs:
           cd workspace
           export ALLOW_MISSING_DEPENDENCIES=true
           source build/envsetup.sh
-          lunch twrp_${{ env.DEVICE_NAME }}-eng
+          # TeamWin android-14.1 build requires <product>-<release>-<variant>
+          # (release validated against release_config_map, try common ones)
+          LUNCH_OK=0
+          for RELEASE in "ap2a" "ap3a" "trunk_staging" "trunk"; do
+            COMBO="twrp_${{ env.DEVICE_NAME }}-${RELEASE}-eng"
+            echo "Trying lunch combo: $COMBO"
+            if lunch "$COMBO"; then
+              echo "lunch OK: $COMBO"
+              LUNCH_OK=1
+              break
+            fi
+          done
+          if [ "$LUNCH_OK" -ne 1 ]; then
+            echo "::error::no valid lunch combo found"
+            lunch 2>&1 | grep "twrp_" | head -20 || true
+            exit 1
+          fi
           # Dedicated recovery partition (not recovery-as-boot)
           mka recoveryimage -j$(nproc --all) 2>&1 | tee /tmp/build.log
           if [ ! -f out/target/product/${{ env.DEVICE_NAME }}/recovery.img ]; then
