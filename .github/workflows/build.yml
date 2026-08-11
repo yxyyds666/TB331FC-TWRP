@@ -6,9 +6,10 @@ on:
   workflow_dispatch:
 
 env:
-  # twrp-14 AOSP minimal manifest (includes TeamWin recovery + TWRP projects via twrp-default.xml)
+  # twrp-14.1 AOSP minimal manifest: includes build/release project (release
+  # config map) + TeamWin recovery/build overrides via twrp-default.xml
   MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git
-  MANIFEST_BRANCH: twrp-14
+  MANIFEST_BRANCH: twrp-14.1
   # Stock-compatible GKI kernel release (TB331FC-Kernel)
   KERNEL_REPO: yxyyds666/TB331FC-Kernel
   DEVICE_NAME: TB331FC
