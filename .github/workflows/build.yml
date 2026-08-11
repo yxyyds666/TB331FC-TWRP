@@ -24,6 +24,23 @@ jobs:
       - name: Checkout device tree
         uses: actions/checkout@v4
 
+      # ubuntu-22.04 runner has ~14GB free on / and 16GB RAM; Soong's
+      # whole-tree analysis OOMs the runner cgroup (runner loses
+      # communication with server). Use the larger /mnt disk, add swap,
+      # and disable systemd-oomd (same fixes kansas/fox_14.1 needed).
+      - name: Relocate build dir to /mnt and disable OOM killer
+        run: |
+          df -h / /mnt
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          sudo apt-get clean
+          sudo systemctl mask --now systemd-oomd.service systemd-oomd.socket || true
+          sudo fallocate -l 12G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          free -h
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -67,7 +84,8 @@ jobs:
 
       - name: Initialize repo (twrp-14)
         run: |
-          mkdir -p workspace
+          mkdir -p /mnt/workspace
+          ln -sfn /mnt/workspace workspace
           cd workspace
           git config --global user.name "TWRP Builder"
           git config --global user.email "twrp@localhost"
@@ -127,11 +145,14 @@ jobs:
             exit 1
           fi
           ccache -s
+          # 16GB RAM runner: cap parallel jobs to avoid OOM (Soong analysis
+          # alone peaks >12GB). 2 jobs keeps the runner alive.
+          JOB_COUNT=2
           # Dedicated recovery partition (not recovery-as-boot)
-          mka recoveryimage -j$(nproc --all) 2>&1 | tee /tmp/build.log
+          mka recoveryimage -j${JOB_COUNT} 2>&1 | tee /tmp/build.log
           if [ ! -f out/target/product/${{ env.DEVICE_NAME }}/recovery.img ]; then
             echo "recovery.img missing, trying bootimage"
-            mka bootimage -j$(nproc --all) 2>&1 | tee -a /tmp/build.log
+            mka bootimage -j${JOB_COUNT} 2>&1 | tee -a /tmp/build.log
           fi
           ccache -s
 
