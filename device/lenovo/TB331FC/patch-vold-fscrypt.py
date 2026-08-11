@@ -46,6 +46,40 @@ def main():
     fetch(f"{TW_ORG}/android-12.1/fscrypt_policy.h", f"{VOLD}/fscrypt_policy.h")
     fetch(f"{TW_ORG}/android-12.1/fscrypt_policy.cpp", f"{VOLD}/fscrypt_policy.cpp")
 
+    # 1b. android-14.1 removed android::vold::isFsKeyringSupported(); the 12.1
+    #     fscrypt_policy_get_struct uses it. Drop the keyring branch and always
+    #     use the EX ioctl like 14.1 does.
+    fp = f"{VOLD}/fscrypt_policy.cpp"
+    with open(fp) as f:
+        fpsrc = f.read()
+    old_keyring = """    if (android::vold::isFsKeyringSupported()) {
+        ex_policy.policy_size = sizeof(ex_policy.policy);
+        if (ioctl(fd, FS_IOC_GET_ENCRYPTION_POLICY_EX, &ex_policy) != 0) {
+            PLOG(ERROR) << "Failed to get encryption policy for " << directory;
+            close(fd);
+            return false;
+        }
+    } else {
+        if (ioctl(fd, FS_IOC_GET_ENCRYPTION_POLICY, &ex_policy.policy.v1) != 0) {
+            PLOG(ERROR) << "Failed to get encryption policy for " << directory;
+            close(fd);
+            return false;
+        }
+    }"""
+    new_keyring = """    ex_policy.policy_size = sizeof(ex_policy.policy);
+    if (ioctl(fd, FS_IOC_GET_ENCRYPTION_POLICY_EX, &ex_policy) != 0) {
+        PLOG(ERROR) << "Failed to get encryption policy for " << directory;
+        close(fd);
+        return false;
+    }"""
+    if old_keyring in fpsrc:
+        fpsrc = fpsrc.replace(old_keyring, new_keyring)
+        with open(fp, "w") as f:
+            f.write(fpsrc)
+        print("patched: fscrypt_policy_get_struct keyring branch removed")
+    else:
+        print("warning: keyring branch pattern not found in fscrypt_policy.cpp")
+
     # 2. Rewrite lookup_ref_key / lookup_ref_tar / lookup_ref_key_internal in
     #    Decrypt.cpp to union signatures (libtar passes fscrypt_policy*).
     dec = f"{VOLD}/Decrypt.cpp"
