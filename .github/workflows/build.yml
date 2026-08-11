@@ -84,7 +84,8 @@ jobs:
 
       - name: Initialize repo (twrp-14)
         run: |
-          mkdir -p /mnt/workspace
+          sudo mkdir -p /mnt/workspace
+          sudo chown "$(id -u):$(id -g)" /mnt/workspace
           ln -sfn /mnt/workspace workspace
           cd workspace
           git config --global user.name "TWRP Builder"
