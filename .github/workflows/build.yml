@@ -40,6 +40,23 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
+      - name: Set up ccache
+        run: |
+          echo "USE_CCACHE=1" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+          ccache -M 6G
+          ccache -o compression=true
+          ccache -z
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-twrp-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            ccache-twrp-${{ runner.os }}-${{ github.ref }}-
+            ccache-twrp-${{ runner.os }}-
+
       - name: Install mkbootimg
         run: |
           mkdir -p /tmp/boottools
@@ -109,12 +126,14 @@ jobs:
             lunch 2>&1 | grep "twrp_" | head -20 || true
             exit 1
           fi
+          ccache -s
           # Dedicated recovery partition (not recovery-as-boot)
           mka recoveryimage -j$(nproc --all) 2>&1 | tee /tmp/build.log
           if [ ! -f out/target/product/${{ env.DEVICE_NAME }}/recovery.img ]; then
             echo "recovery.img missing, trying bootimage"
             mka bootimage -j$(nproc --all) 2>&1 | tee -a /tmp/build.log
           fi
+          ccache -s
 
       - name: Locate and verify output
         run: |

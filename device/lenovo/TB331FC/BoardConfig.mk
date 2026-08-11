@@ -75,6 +75,7 @@ BOARD_USES_SYSTEM_DLKMIMAGE := true
 BOARD_USES_SYSTEM_EXTIMAGE := true
 
 # Workaround for error copying vendor files to recovery ramdisk
+TARGET_COPY_OUT_VENDOR := vendor
 BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE := ext4
 
 # Recovery
