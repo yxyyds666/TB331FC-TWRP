@@ -6,12 +6,9 @@ on:
   workflow_dispatch:
 
 env:
-  # twrp-14 AOSP minimal manifest
+  # twrp-14 AOSP minimal manifest (includes TeamWin recovery + TWRP projects via twrp-default.xml)
   MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git
   MANIFEST_BRANCH: twrp-14
-  # TWRP fork replaces AOSP bootable/recovery
-  RECOVERY_URL: https://github.com/TeamWin/android_bootable_recovery.git
-  RECOVERY_BRANCH: android-14
   # Stock-compatible GKI kernel release (TB331FC-Kernel)
   KERNEL_REPO: yxyyds666/TB331FC-Kernel
   DEVICE_NAME: TB331FC
@@ -57,18 +54,6 @@ jobs:
           git config --global user.name "TWRP Builder"
           git config --global user.email "twrp@localhost"
           repo init --depth=1 -u ${{ env.MANIFEST_URL }} -b ${{ env.MANIFEST_BRANCH }}
-
-      - name: Add TWRP fork override (local manifest)
-        run: |
-          mkdir -p workspace/.repo/local_manifests
-          printf '%s\n' \
-            '<?xml version="1.0" encoding="UTF-8"?>' \
-            '<manifest>' \
-            '  <remote name="github" fetch="https://github.com"/>' \
-            '  <remove-project name="platform/bootable/recovery"/>' \
-            '  <project path="bootable/recovery" name="TeamWin/android_bootable_recovery" remote="github" revision="android-14" clone-depth="1"/>' \
-            '</manifest>' > workspace/.repo/local_manifests/twrp.xml
-          cat workspace/.repo/local_manifests/twrp.xml
 
       - name: Sync source
         run: |
