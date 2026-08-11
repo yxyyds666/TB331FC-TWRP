@@ -57,14 +57,14 @@ jobs:
       - name: Add TWRP fork override (local manifest)
         run: |
           mkdir -p workspace/.repo/local_manifests
-          cat > workspace/.repo/local_manifests/twrp.xml <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<manifest>
-  <remote name="github" fetch="https://github.com"/>
-  <remove-project name="platform/bootable/recovery"/>
-  <project path="bootable/recovery" name="TeamWin/android_bootable_recovery" remote="github" revision="android-14" clone-depth="1"/>
-</manifest>
-EOF
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<manifest>' \
+            '  <remote name="github" fetch="https://github.com"/>' \
+            '  <remove-project name="platform/bootable/recovery"/>' \
+            '  <project path="bootable/recovery" name="TeamWin/android_bootable_recovery" remote="github" revision="android-14" clone-depth="1"/>' \
+            '</manifest>' > workspace/.repo/local_manifests/twrp.xml
+          cat workspace/.repo/local_manifests/twrp.xml
 
       - name: Sync source
         run: |
