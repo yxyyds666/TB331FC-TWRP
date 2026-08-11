@@ -135,8 +135,34 @@ jobs:
           ls -la /tmp/boot_extract/kernel
           cp /tmp/boot_extract/kernel workspace/${{ env.DEVICE_PATH }}/prebuilt/kernel
 
+      # The minimal TWRP manifest does not generate all AIDL NDK platform
+      # libraries. With TW_INCLUDE_CRYPTO_FBE=true, libtar links against
+      # several android.security/system AIDL libs that are absent, causing
+      # ninja to fail at link time:
+      #   ninja: 'android.security.apc-ndk_platform.so.toc', needed by
+      #   'libtar.so', missing and no known rule to make it
+      # Create empty stubs so the linker can proceed.
+      - name: Create stubs for missing AIDL ndk_platform libraries
+        run: |
+          PRODUCT_OUT="out/target/product/${{ env.DEVICE_NAME }}"
+          MISSING_LIBS=(
+            android.security.apc-ndk_platform
+            android.system.keystore2-V1-ndk_platform
+            android.security.authorization-ndk_platform
+            android.security.maintenance-ndk_platform
+          )
+          for lib in "${MISSING_LIBS[@]}"; do
+            LIB_DIR="${PRODUCT_OUT}/obj/SHARED_LIBRARIES/${lib}_intermediates"
+            mkdir -p "$LIB_DIR"
+            touch "${LIB_DIR}/${lib}.so"
+            touch "${LIB_DIR}/${lib}.so.toc"
+            echo "Created stub for ${lib}"
+          done
+        working-directory: workspace
+
       - name: Build TWRP
         run: |
+          set -o pipefail
           cd workspace
           export ALLOW_MISSING_DEPENDENCIES=true
           source build/envsetup.sh
@@ -172,15 +198,18 @@ jobs:
       - name: Locate and verify output
         run: |
           cd workspace
+          FOUND=""
           for f in recovery.img boot.img; do
             if [ -f out/target/product/${{ env.DEVICE_NAME }}/$f ]; then
+              FOUND="$f"
               echo "FOUND=$f" >> $GITHUB_ENV
               break
             fi
           done
-          IMG=out/target/product/${{ env.DEVICE_NAME }}/${{ env.FOUND }}
-          if [ -z "${{ env.FOUND }}" ] || [ ! -f "${IMG}" ]; then
+          IMG=out/target/product/${{ env.DEVICE_NAME }}/${FOUND}
+          if [ -z "${FOUND}" ] || [ ! -f "${IMG}" ]; then
             echo "::error::no recovery/boot img found"
+            ls -la out/target/product/${{ env.DEVICE_NAME }}/ 2>&1 | tail -20
             tail -50 /tmp/build.log
             exit 1
           fi
