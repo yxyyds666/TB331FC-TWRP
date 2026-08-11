@@ -102,6 +102,18 @@ jobs:
           mkdir -p workspace/${{ env.DEVICE_PATH }}
           cp -r ${{ env.DEVICE_PATH }}/* workspace/${{ env.DEVICE_PATH }}/
 
+      # TeamWin vendor/twrp android-14.1 kernel.mk has a tab-indented
+      # "$(call twrp-depmod)" outside any rule -> "commands commence
+      # before first target". depmod is already done by our own
+      # prebuilt/Android.mk, so remove the stale call.
+      - name: Patch TeamWin kernel.mk (upstream tab bug)
+        run: |
+          cd workspace
+          sed -i '/^[[:space:]]*\$(call twrp-depmod)$/d' vendor/twrp/build/tasks/kernel.mk
+          grep -n "twrp-depmod" vendor/twrp/build/tasks/kernel.mk && \
+            (echo "::warning::twrp-depmod still present in kernel.mk"; grep -n -B2 -A2 "twrp-depmod" vendor/twrp/build/tasks/kernel.mk) || \
+            echo "patched: stale depmod call removed"
+
       - name: Download latest kernel release (boot-main.img)
         run: |
           RELEASE_URL=$(curl -s "https://api.github.com/repos/${{ env.KERNEL_REPO }}/releases/latest" | grep -oP '"browser_download_url": "\K[^"]*boot-main\.img' | head -1)
