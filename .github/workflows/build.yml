@@ -44,7 +44,11 @@ jobs:
 
       - name: Install mkbootimg
         run: |
-          sudo pip3 install mkbootimg
+          mkdir -p /tmp/boottools
+          curl -sL -o /tmp/boottools/unpack_bootimg.py https://raw.githubusercontent.com/osm0sis/mkbootimg/master/unpack_bootimg.py
+          chmod +x /tmp/boottools/unpack_bootimg.py
+          sudo ln -sf /tmp/boottools/unpack_bootimg.py /usr/local/bin/unpack_bootimg
+          unpack_bootimg --help
 
       - name: Initialize repo (twrp-14)
         run: |
@@ -91,6 +95,7 @@ jobs:
           unpack_bootimg --boot_img /tmp/boot-main.img --out /tmp/boot_extract
           if [ ! -f /tmp/boot_extract/kernel ]; then
             echo "::error::kernel not found in boot-main.img"
+            ls -la /tmp/boot_extract || true
             exit 1
           fi
           ls -la /tmp/boot_extract/kernel
