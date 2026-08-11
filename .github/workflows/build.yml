@@ -1,0 +1,150 @@
+name: Build TWRP for TB331FC
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  # twrp-14 AOSP minimal manifest
+  MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git
+  MANIFEST_BRANCH: twrp-14
+  # TWRP fork replaces AOSP bootable/recovery
+  RECOVERY_URL: https://github.com/TeamWin/android_bootable_recovery.git
+  RECOVERY_BRANCH: android-14
+  # Stock-compatible GKI kernel release (TB331FC-Kernel)
+  KERNEL_REPO: yxyyds666/TB331FC-Kernel
+  DEVICE_NAME: TB331FC
+  DEVICE_PATH: device/lenovo/TB331FC
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout device tree
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex git gnupg \
+            gperf imagemagick liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev \
+            libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc \
+            zip zlib1g-dev lib32z1-dev lib32ncurses-dev lib32readline-dev \
+            libc6-dev-i386 lib32gcc-1 lib32stdc++6 python3 python3-pip unzip
+
+      - name: Install repo tool
+        run: |
+          mkdir -p ~/bin
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          sudo ln -sf ~/bin/repo /usr/bin/repo
+
+      - name: Install mkbootimg
+        run: |
+          sudo pip3 install mkbootimg
+
+      - name: Initialize repo (twrp-14)
+        run: |
+          mkdir -p workspace
+          cd workspace
+          git config --global user.name "TWRP Builder"
+          git config --global user.email "twrp@localhost"
+          repo init --depth=1 -u ${{ env.MANIFEST_URL }} -b ${{ env.MANIFEST_BRANCH }}
+
+      - name: Add TWRP fork override (local manifest)
+        run: |
+          mkdir -p workspace/.repo/local_manifests
+          cat > workspace/.repo/local_manifests/twrp.xml <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="github" fetch="https://github.com"/>
+  <remove-project name="platform/bootable/recovery"/>
+  <project path="bootable/recovery" name="TeamWin/android_bootable_recovery" remote="github" revision="android-14" clone-depth="1"/>
+</manifest>
+EOF
+
+      - name: Sync source
+        run: |
+          cd workspace
+          repo sync -j$(nproc --all) --force-sync --no-tags --no-clone-bundle
+
+      - name: Copy device tree into workspace
+        run: |
+          mkdir -p workspace/${{ env.DEVICE_PATH }}
+          cp -r ${{ env.DEVICE_PATH }}/* workspace/${{ env.DEVICE_PATH }}/
+
+      - name: Download latest kernel release (boot-main.img)
+        run: |
+          RELEASE_URL=$(curl -s "https://api.github.com/repos/${{ env.KERNEL_REPO }}/releases/latest" | grep -oP '"browser_download_url": "\K[^"]*boot-main\.img' | head -1)
+          if [ -z "${RELEASE_URL}" ]; then
+            echo "::error::No boot-main.img in latest release of ${{ env.KERNEL_REPO }}"
+            exit 1
+          fi
+          echo "Downloading: ${RELEASE_URL}"
+          curl -L -o /tmp/boot-main.img "${RELEASE_URL}"
+
+      - name: Extract kernel Image from boot-main.img
+        run: |
+          unpack_bootimg --boot_img /tmp/boot-main.img --out /tmp/boot_extract
+          if [ ! -f /tmp/boot_extract/kernel ]; then
+            echo "::error::kernel not found in boot-main.img"
+            exit 1
+          fi
+          ls -la /tmp/boot_extract/kernel
+          cp /tmp/boot_extract/kernel workspace/${{ env.DEVICE_PATH }}/prebuilt/kernel
+
+      - name: Build TWRP
+        run: |
+          cd workspace
+          export ALLOW_MISSING_DEPENDENCIES=true
+          source build/envsetup.sh
+          lunch twrp_${{ env.DEVICE_NAME }}-eng
+          # Dedicated recovery partition (not recovery-as-boot)
+          mka recoveryimage -j$(nproc --all) 2>&1 | tee /tmp/build.log
+          if [ ! -f out/target/product/${{ env.DEVICE_NAME }}/recovery.img ]; then
+            echo "recovery.img missing, trying bootimage"
+            mka bootimage -j$(nproc --all) 2>&1 | tee -a /tmp/build.log
+          fi
+
+      - name: Locate and verify output
+        run: |
+          cd workspace
+          for f in recovery.img boot.img; do
+            if [ -f out/target/product/${{ env.DEVICE_NAME }}/$f ]; then
+              echo "FOUND=$f" >> $GITHUB_ENV
+              break
+            fi
+          done
+          IMG=out/target/product/${{ env.DEVICE_NAME }}/${{ env.FOUND }}
+          if [ -z "${{ env.FOUND }}" ] || [ ! -f "${IMG}" ]; then
+            echo "::error::no recovery/boot img found"
+            tail -50 /tmp/build.log
+            exit 1
+          fi
+          echo "BUILD_DATE=$(date +%Y%m%d)" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(date +%H%M)" >> $GITHUB_ENV
+          echo "MD5_IMG=$(md5sum ${IMG} | cut -d ' ' -f 1)" >> $GITHUB_ENV
+          ls -la ${IMG}
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            workspace/out/target/product/${{ env.DEVICE_NAME }}/${{ env.FOUND }}
+          name: "TWRP for ${{ env.DEVICE_NAME }} (${{ env.BUILD_DATE }})"
+          tag_name: "twrp-${{ env.BUILD_DATE }}-${{ env.BUILD_TIME }}"
+          body: |
+            ### TWRP Recovery for Lenovo Xiaoxin Pad 2024 (TB331FC)
+            **Build:** ${{ env.BUILD_DATE }} ${{ env.BUILD_TIME }}
+            **Kernel:** GKI 5.15.167 (stock KMI compatible)
+
+            **Flash to recovery partition (both slots):**
+            ```
+            fastboot flash recovery_a ${{ env.FOUND }}
+            fastboot flash recovery_b ${{ env.FOUND }}
+            ```
+
+            **MD5:** `${{ env.MD5_IMG }}`

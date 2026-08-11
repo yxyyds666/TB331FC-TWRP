@@ -1,0 +1,19 @@
+# Gatekeeper, Encryption
+fbe.metadata.wrappedkey=true
+vendor.gatekeeper.disable_spu=true
+keymaster_ver=4.1
+
+# Platform
+ro.board.platform=khaje
+
+# FUSE passthrough
+persist.sys.fuse.passthrough.enable=true
+
+# Dynamic Partitions
+ro.boot.dynamic_partitions=true
+
+# Charger suspend
+ro.charger.enable_suspend=1
+
+# ADB
+ro.adb.secure=0

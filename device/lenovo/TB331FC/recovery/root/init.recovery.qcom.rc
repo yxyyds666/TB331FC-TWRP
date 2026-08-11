@@ -1,0 +1,51 @@
+service unified-script /system/bin/unified-script.sh
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
+
+# Set SELinux to Permissive
+on early-init
+    write /sys/fs/selinux/enforce 0
+    write /proc/sys/kernel/firmware_config/force_sysfs_fallback 1
+
+on early-fs
+    write /proc/sys/walt/sched_lib_name "recovery,magiskboot,Updater,updater,update_engine_sideload"
+    write /proc/sys/walt/sched_lib_mask_force 255
+
+on init
+    write /sys/class/backlight/panel0-backlight/brightness 200
+
+on init
+    start boot-hal-1-2
+
+on init
+    wait /sys/class/power_supply/battery
+    start health-hal-2-1
+
+on fs
+    wait /dev/block/platform/soc/${ro.boot.bootdevice}
+    symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
+
+on fs
+    chmod 0660 /dev/qseecom
+    chown system drmrpc /dev/qseecom
+    chmod 0664 /dev/ion
+    chown system system /dev/ion
+    install_keyring
+
+on boot
+    setprop sys.usb.config adb
+
+# Load touch driver after kernel modules are loaded by TWRP
+on property:twrp.modules.loaded=true
+    start unified-script
+    start load-touch
+
+service load-touch /system/bin/load-touch.sh
+    user root
+    group root
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0
