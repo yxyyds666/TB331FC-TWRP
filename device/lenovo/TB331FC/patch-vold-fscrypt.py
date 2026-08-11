@@ -75,7 +75,16 @@ def main():
     if internal_14 not in src:
         print("error: 14.1 lookup_ref_key_internal signature not found")
         sys.exit(1)
-    src = src.replace(internal_14, internal_12)
+    # Replace the ENTIRE 14.1 internal function (signature line through its
+    # closing brace at column 0) with the 12.1-style implementation.
+    fstart = src.find(internal_14)
+    # find the closing "}\n" of the function: the line after the last
+    # "    return false;\n}\n" belonging to this function
+    fend = src.find("\n}\n", fstart)
+    if fend == -1:
+        print("error: lookup_ref_key_internal body end not found")
+        sys.exit(1)
+    src = src[:fstart] + internal_12 + src[fend + 3:]
 
     # Replace the whole conditional-compiled lookup_ref_key (v1/v2 split)
     # with a single union-signature implementation.
