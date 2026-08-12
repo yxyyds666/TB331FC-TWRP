@@ -1,6 +1,5 @@
 #
 # Copyright (C) 2024 The Android Open Source Project
-#
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -24,45 +23,48 @@ TARGET_2ND_CPU_ABI2 := armeabi
 TARGET_2ND_CPU_VARIANT := cortex-a53
 TARGET_2ND_CPU_VARIANT_RUNTIME := cortex-a53
 
-# Platform
-TARGET_BOARD_PLATFORM := khaje
-TARGET_BOARD_PLATFORM_GPU := qcom-adreno610
+# Bootloader
+TARGET_NO_BOOTLOADER := true
 TARGET_USES_UEFI := true
+
+# Platform
+TARGET_BOARD_PLATFORM := bengal
+TARGET_BOARD_PLATFORM_GPU := qcom-adreno610
 BOARD_USES_QCOM_HARDWARE := true
 
-# A/B
-AB_OTA_UPDATER := true
-
-# Kernel / Recovery image
+# Kernel (GKI, header v4, empty recovery kernel like stock)
+BOARD_KERNEL_PAGESIZE := 4096
 TARGET_KERNEL_ARCH := arm64
 TARGET_KERNEL_HEADER_ARCH := arm64
-
-BOARD_KERNEL_PAGESIZE := 4096
 BOARD_KERNEL_IMAGE_NAME := Image
 BOARD_BOOT_HEADER_VERSION := 4
 BOARD_MKBOOTIMG_ARGS += --header_version $(BOARD_BOOT_HEADER_VERSION)
 BOARD_MKBOOTIMG_ARGS += --pagesize $(BOARD_KERNEL_PAGESIZE)
 
-# Prebuilt GKI kernel (download in CI from TB331FC-Kernel release)
-TARGET_FORCE_PREBUILT_KERNEL := true
-TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/kernel
+# Stock recovery.img contains no kernel (GKI): bootloader loads it from boot.
+# Match stock layout exactly.
+TARGET_PREBUILT_KERNEL := /dev/null
 
-# Use LZ4 Ramdisk compression instead of GZIP
+# Use LZ4 Ramdisk compression (stock uses LZ4)
 BOARD_RAMDISK_USE_LZ4 := true
+
+# A/B
+AB_OTA_UPDATER := true
 
 # Partitions (sizes from stock dump)
 BOARD_FLASH_BLOCK_SIZE := 262144
+BOARD_DTBOIMG_PARTITION_SIZE := 25165824
+BOARD_INIT_BOOT_IMAGE_PARTITION_SIZE := 8388608
 BOARD_BOOTIMAGE_PARTITION_SIZE := 104857600
 BOARD_RECOVERYIMAGE_PARTITION_SIZE := 104857600
-BOARD_DTBOIMG_PARTITION_SIZE := 25165824
 BOARD_VENDOR_BOOTIMAGE_PARTITION_SIZE := 100663296
 
 BOARD_HAS_LARGE_FILESYSTEM := true
 
-# Dynamic Partitions
+# Dynamic Partitions (from stock recovery.fstab: ext4 logical)
 BOARD_SUPER_PARTITION_SIZE := 9126805504
 BOARD_SUPER_PARTITION_GROUPS := lenovo_dynamic_partitions
-BOARD_LENOVO_DYNAMIC_PARTITIONS_PARTITION_LIST := system system_ext vendor odm product
+BOARD_LENOVO_DYNAMIC_PARTITIONS_PARTITION_LIST := system system_ext vendor vendor_dlkm system_dlkm odm product
 BOARD_LENOVO_DYNAMIC_PARTITIONS_SIZE := 9122611200
 
 # Filesystems
@@ -70,8 +72,6 @@ TARGET_USERIMAGES_USE_EXT4 := true
 TARGET_USERIMAGES_USE_F2FS := true
 TARGET_USES_MKE2FS := true
 BOARD_USES_METADATA_PARTITION := true
-BOARD_USES_VENDOR_DLKMIMAGE := true
-BOARD_USES_SYSTEM_DLKMIMAGE := true
 BOARD_USES_SYSTEM_EXTIMAGE := true
 
 # Workaround for error copying vendor files to recovery ramdisk
@@ -85,7 +85,7 @@ TARGET_SYSTEM_PROP := \
 TARGET_RECOVERY_FSTAB := \
     $(DEVICE_PATH)/recovery.fstab
 
-TARGET_RECOVERY_PIXEL_FORMAT := RGBX_8888
+TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
 TARGET_RECOVERY_QCOM_RTC_FIX := true
 TARGET_USES_LOGD := true
 

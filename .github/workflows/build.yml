@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
 
 env:
-  # twrp-14.1 AOSP minimal manifest: includes build/release project (release
-  # config map) + TeamWin recovery/build overrides via twrp-default.xml
+  # twrp-12.1 minimal manifest: self-consistent (recovery+vold+cryptfs all
+  # present, no Android-14 fscrypt/AIDL regressions)
   MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git
-  MANIFEST_BRANCH: twrp-14.1
-  # Stock-compatible GKI kernel release (TB331FC-Kernel)
+  MANIFEST_BRANCH: twrp-12.1
+  # Stock-compatible GKI kernel release (TB331FC-Kernel), kernel extracted from boot-main.img
   KERNEL_REPO: yxyyds666/TB331FC-Kernel
   DEVICE_NAME: TB331FC
   DEVICE_PATH: device/lenovo/TB331FC
@@ -25,9 +25,8 @@ jobs:
         uses: actions/checkout@v4
 
       # ubuntu-22.04 runner has ~14GB free on / and 16GB RAM; Soong's
-      # whole-tree analysis OOMs the runner cgroup (runner loses
-      # communication with server). Use the larger /mnt disk, add swap,
-      # and disable systemd-oomd (same fixes kansas/fox_14.1 needed).
+      # whole-tree analysis OOMs the runner cgroup. Use larger /mnt disk,
+      # add swap, disable systemd-oomd.
       - name: Relocate build dir to /mnt and disable OOM killer
         run: |
           df -h / /mnt
@@ -69,10 +68,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-twrp-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
+          key: ccache-twrp12-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
-            ccache-twrp-${{ runner.os }}-${{ github.ref }}-
-            ccache-twrp-${{ runner.os }}-
+            ccache-twrp12-${{ runner.os }}-${{ github.ref }}-
+            ccache-twrp12-${{ runner.os }}-
 
       - name: Install mkbootimg
         run: |
@@ -82,7 +81,7 @@ jobs:
           sudo ln -sf /tmp/boottools/unpack_bootimg.py /usr/local/bin/unpack_bootimg
           unpack_bootimg --help
 
-      - name: Initialize repo (twrp-14)
+      - name: Initialize repo (twrp-12.1)
         run: |
           sudo mkdir -p /mnt/workspace
           sudo chown "$(id -u):$(id -g)" /mnt/workspace
@@ -102,28 +101,6 @@ jobs:
           mkdir -p workspace/${{ env.DEVICE_PATH }}
           cp -r ${{ env.DEVICE_PATH }}/* workspace/${{ env.DEVICE_PATH }}/
 
-      # TeamWin vendor/twrp android-14.1 kernel.mk has a tab-indented
-      # "$(call twrp-depmod)" outside any rule -> "commands commence
-      # before first target". depmod is already done by our own
-      # prebuilt/Android.mk, so remove the stale call.
-      - name: Patch TeamWin kernel.mk (upstream tab bug)
-        run: |
-          cd workspace
-          sed -i '/^[[:space:]]*\$(call twrp-depmod)$/d' vendor/twrp/build/tasks/kernel.mk
-          grep -n "twrp-depmod" vendor/twrp/build/tasks/kernel.mk && \
-            (echo "::warning::twrp-depmod still present in kernel.mk"; grep -n -B2 -A2 "twrp-depmod" vendor/twrp/build/tasks/kernel.mk) || \
-            echo "patched: stale depmod call removed"
-
-      # TeamWin system/vold android-14.1 regressed the fscrypt_policy API in
-      # 2022: the union fscrypt_policy type and get_policy_size() helpers that
-      # libtar (android-14.1 recovery) calls were removed. Restore them from
-      # the android-12.1 branch (still the latest working API).
-      - name: Patch system/vold fscrypt API (upstream regression)
-        run: |
-          cd workspace
-          python3 ${{ env.DEVICE_PATH }}/patch-vold-fscrypt.py
-          echo "patched: vold fscrypt union API restored"
-
       - name: Download latest kernel release (boot-main.img)
         run: |
           RELEASE_URL=$(curl -s "https://api.github.com/repos/${{ env.KERNEL_REPO }}/releases/latest" | grep -oP '"browser_download_url": "\K[^"]*boot-main\.img' | head -1)
@@ -134,6 +111,10 @@ jobs:
           echo "Downloading: ${RELEASE_URL}"
           curl -L -o /tmp/boot-main.img "${RELEASE_URL}"
 
+      # Stock recovery_a.img contains NO kernel (GKI device, header v4). The
+      # bootloader injects the kernel from the boot partition, so recovery.img
+      # is built with an empty kernel (TARGET_PREBUILT_KERNEL=/dev/null) exactly
+      # like stock. The kernel is kept for reference/verification only.
       - name: Extract kernel Image from boot-main.img
         run: |
           unpack_bootimg --boot_img /tmp/boot-main.img --out /tmp/boot_extract
@@ -145,46 +126,16 @@ jobs:
           ls -la /tmp/boot_extract/kernel
           cp /tmp/boot_extract/kernel workspace/${{ env.DEVICE_PATH }}/prebuilt/kernel
 
-      # libtar/Android.mk (android-14.1) references pre-Android-14 AIDL lib
-      # names (`android.security.apc-ndk_platform` etc.) that no longer exist:
-      # Android 14 interfaces only generate the plain `-ndk` variant and
-      # keystore2 is versioned V4. libvold (linked into libtar) also needs
-      # libsysutils, libasync_safe and libboot_control_client which libtar
-      # omits -> ninja "no known rule" and linker "undefined symbol" failures.
-      - name: Patch libtar AIDL lib names and libvold transitive deps
-        run: |
-          cd workspace
-          python3 ${{ env.DEVICE_PATH }}/patch-libtar-libs.py
-          grep -n "ndk_platform\|libsysutils\|libasync_safe\|libboot_control_client" bootable/recovery/libtar/Android.mk || true
-
       - name: Build TWRP
         run: |
           set -o pipefail
           cd workspace
           export ALLOW_MISSING_DEPENDENCIES=true
           source build/envsetup.sh
-          # TeamWin android-14.1 build requires <product>-<release>-<variant>
-          # (release validated against release_config_map, try common ones)
-          LUNCH_OK=0
-          for RELEASE in "ap2a" "ap3a" "trunk_staging" "trunk"; do
-            COMBO="twrp_${{ env.DEVICE_NAME }}-${RELEASE}-eng"
-            echo "Trying lunch combo: $COMBO"
-            if lunch "$COMBO"; then
-              echo "lunch OK: $COMBO"
-              LUNCH_OK=1
-              break
-            fi
-          done
-          if [ "$LUNCH_OK" -ne 1 ]; then
-            echo "::error::no valid lunch combo found"
-            lunch 2>&1 | grep "twrp_" | head -20 || true
-            exit 1
-          fi
+          lunch twrp_${{ env.DEVICE_NAME }}-eng
           ccache -s
-          # 16GB RAM runner: cap parallel jobs to avoid OOM (Soong analysis
-          # alone peaks >12GB). 2 jobs keeps the runner alive.
+          # 16GB RAM runner: cap parallel jobs to avoid OOM
           JOB_COUNT=2
-          # Dedicated recovery partition (not recovery-as-boot)
           mka recoveryimage -j${JOB_COUNT} 2>&1 | tee /tmp/build.log
           if [ ! -f out/target/product/${{ env.DEVICE_NAME }}/recovery.img ]; then
             echo "recovery.img missing, trying bootimage"
@@ -225,6 +176,7 @@ jobs:
           body: |
             ### TWRP Recovery for Lenovo Xiaoxin Pad 2024 (TB331FC)
             **Build:** ${{ env.BUILD_DATE }} ${{ env.BUILD_TIME }}
+            **Baseline:** twrp-12.1 minimal manifest (SM6225 bengal)
             **Kernel:** GKI 5.15.167 (stock KMI compatible)
 
             **Flash to recovery partition (both slots):**

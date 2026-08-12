@@ -1,12 +1,10 @@
-# Android fstab file.
-# The filesystem that contains the filesystem checker binary (typically /system) cannot
-# specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
-
+# TWRP fstab for Lenovo TB331FC
+# Derived from stock recovery.fstab (Android 13, ZUI 1.1.10)
 # mount point          fstype  device                                        device2              flags
 
 # Boot
 /boot                  emmc    /dev/block/bootdevice/by-name/boot                                 flags=display="Boot";backup=1;slotselect;flashimg=1
-/vendor_boot           emmc    /dev/block/bootdevice/by-name/vendor_boot                          flags=display="Vendor_Boot";slotselect;backup=1;flashimg=1
+/init_boot             emmc    /dev/block/bootdevice/by-name/init_boot                            flags=display="Init_Boot";slotselect;flashimg=1
 /recovery              emmc    /dev/block/bootdevice/by-name/recovery                             flags=display="Recovery";slotselect;backup=1;flashimg=1
 
 # Data/Metadata
@@ -29,7 +27,6 @@
 
 # Persistent Firmware & Properties
 /persist               ext4    /dev/block/bootdevice/by-name/persist                              flags=display="Persist";backup=0
-/persist_image         emmc    /dev/block/bootdevice/by-name/persist                              flags=display="Persist";flashimg=1;backup=1
 
 # Modem/Firmware partitions
 /modem                 vfat    /dev/block/bootdevice/by-name/modem                                flags=display="Modem";slotselect;fsflags="ro,shortname=lower,uid=1000,gid=1000,dmask=227,fmask=337,context=u:object_r:firmware_file:s0 wait"
@@ -54,4 +51,3 @@
 /storage       	       auto    /data/media/0                                                       flags=display="Internal Storage";backup=1;usermrf;fsflags="bind,utf8";removable
 /usb_otg               auto    /dev/block/sdg1                            /dev/block/sdg          flags=display="USB-Storage";fsflags=utf8;storage;wipeingui;removable
 /sdcard1               auto    /dev/block/mmcblk1p1                       /dev/block/mmcblk1      flags=display="MicroSD";storage;wipeingui;removable
-#
