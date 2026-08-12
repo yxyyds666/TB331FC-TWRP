@@ -145,33 +145,17 @@ jobs:
           ls -la /tmp/boot_extract/kernel
           cp /tmp/boot_extract/kernel workspace/${{ env.DEVICE_PATH }}/prebuilt/kernel
 
-      # The minimal TWRP manifest does not generate all AIDL NDK platform
-      # libraries. With TW_INCLUDE_CRYPTO_FBE=true, libtar links against
-      # several android.security/system AIDL libs that are absent, causing
-      # ninja to fail at link time:
-      #   ninja: 'android.security.apc-ndk_platform.so.toc', needed by
-      #   'libtar.so', missing and no known rule to make it
-      # Create empty stubs so the linker can proceed.
-      - name: Create stubs for missing AIDL ndk_platform libraries
+      # libtar/Android.mk (android-14.1) references pre-Android-14 AIDL lib
+      # names (`android.security.apc-ndk_platform` etc.) that no longer exist:
+      # Android 14 interfaces only generate the plain `-ndk` variant and
+      # keystore2 is versioned V4. libvold (linked into libtar) also needs
+      # libsysutils, libasync_safe and libboot_control_client which libtar
+      # omits -> ninja "no known rule" and linker "undefined symbol" failures.
+      - name: Patch libtar AIDL lib names and libvold transitive deps
         run: |
-          PRODUCT_OUT="out/target/product/${{ env.DEVICE_NAME }}"
-          MISSING_LIBS=(
-            android.security.apc-ndk_platform
-            android.system.keystore2-V1-ndk_platform
-            android.security.authorization-ndk_platform
-            android.security.maintenance-ndk_platform
-          )
-          # 64-bit (obj) and 32-bit (obj_arm) variants both need stubs
-          for ARCH_DIR in obj obj_arm; do
-            for lib in "${MISSING_LIBS[@]}"; do
-              LIB_DIR="${PRODUCT_OUT}/${ARCH_DIR}/SHARED_LIBRARIES/${lib}_intermediates"
-              mkdir -p "$LIB_DIR"
-              touch "${LIB_DIR}/${lib}.so"
-              touch "${LIB_DIR}/${lib}.so.toc"
-              echo "Created stub for ${ARCH_DIR}/${lib}"
-            done
-          done
-        working-directory: workspace
+          cd workspace
+          python3 ${{ env.DEVICE_PATH }}/patch-libtar-libs.py
+          grep -n "ndk_platform\|libsysutils\|libasync_safe\|libboot_control_client" bootable/recovery/libtar/Android.mk || true
 
       - name: Build TWRP
         run: |
