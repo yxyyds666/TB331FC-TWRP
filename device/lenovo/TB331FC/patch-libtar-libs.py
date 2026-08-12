@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """
-Patch TeamWin bootable/recovery android-14.1 libtar/Android.mk so libtar.so
-links against the AIDL NDK libs that actually exist in the twrp-14.1 minimal
+Patch TeamWin bootable/recovery android-14.1 build files so recovery/libtar
+link against the AIDL NDK libs that actually exist in the twrp-14.1 minimal
 manifest, and against the transitive deps of libvold.
 
+Files patched:
+  - bootable/recovery/Android.mk        (recovery executable)
+  - bootable/recovery/libtar/Android.mk (libtar.so, FBE decrypt)
+
 Root cause:
-  - libtar/Android.mk (android-14.1) references the pre-Android-14 AIDL library
-    names `android.security.apc-ndk_platform`, `android.system.keystore2-V1-ndk_platform`,
+  - Both files reference the pre-Android-14 AIDL library names
+    `android.security.apc-ndk_platform`, `android.system.keystore2-V1-ndk_platform`,
     `android.security.authorization-ndk_platform`, `android.security.maintenance-ndk_platform`.
     In Android 14 these interfaces are declared with only the plain `-ndk`
     variant (and keystore2 is versioned V4), so the `-ndk_platform` modules do
@@ -18,11 +22,15 @@ Root cause:
 """
 
 import os
+import re
 import sys
 
-LIBTAR = "bootable/recovery/libtar/Android.mk"
+FILES = [
+    "bootable/recovery/Android.mk",
+    "bootable/recovery/libtar/Android.mk",
+]
 
-# (old, new) pairs in the LOCAL_SHARED_LIBRARIES block
+# (old, new) pairs applied to every patched file
 RENAMES = [
     ("android.security.apc-ndk_platform", "android.security.apc-ndk"),
     ("android.system.keystore2-V1-ndk_platform", "android.system.keystore2-V4-ndk"),
@@ -45,62 +53,57 @@ ADD_STATIC = [
 
 
 def main():
-    if not os.path.isfile(LIBTAR):
-        print(f"error: {LIBTAR} not found (run from workspace root)")
-        sys.exit(1)
+    for f in FILES:
+        if not os.path.isfile(f):
+            print(f"error: {f} not found (run from workspace root)")
+            sys.exit(1)
 
-    with open(LIBTAR) as f:
-        src = f.read()
+    for f in FILES:
+        print(f"=== {f} ===")
+        with open(f) as fh:
+            src = fh.read()
 
-    for old, new in RENAMES:
-        if old in src:
-            src = src.replace(old, new)
-            print(f"renamed: {old} -> {new}")
+        for old, new in RENAMES:
+            if old in src:
+                src = src.replace(old, new)
+                print(f"renamed: {old} -> {new}")
+            else:
+                print(f"ok (absent): {old}")
+
+        # recovery executable uses the same libgatekeeper_aidl anchor as libtar
+        anchor = "        libgatekeeper_aidl"
+        if anchor not in src:
+            print("warning: libgatekeeper_aidl anchor not found, skipping shared/static adds")
         else:
-            print(f"warning: {old} not found")
+            added = []
+            for lib in ADD_SHARED:
+                if re_line_present(src, lib):
+                    print(f"already present: {lib}")
+                    continue
+                src = src.replace(anchor, f"{anchor} \\\n        {lib}", 1)
+                added.append(lib)
+                print(f"added: {lib}")
 
-    # Add missing shared libs at the end of the LOCAL_SHARED_LIBRARIES list.
-    # The FBE block ends with "libgatekeeper_aidl" (no trailing backslash).
-    anchor = "        libgatekeeper_aidl"
-    if anchor not in src:
-        print("error: libgatekeeper_aidl anchor not found")
-        sys.exit(1)
+            # Add static libs to LOCAL_STATIC_LIBRARIES (libtar FBE block).
+            # Recovery executable's crypto block uses "LOCAL_STATIC_LIBRARIES += libkeymint_support".
+            if "libvold libscrypt_static" in src:
+                anchor_static = "    LOCAL_STATIC_LIBRARIES += libvold libscrypt_static"
+                for lib in ADD_STATIC:
+                    if re_line_present(src, lib):
+                        print(f"already present: {lib}")
+                        continue
+                    src = src.replace(anchor_static,
+                                      f"{anchor_static} {lib}", 1)
+                    added.append(lib)
+                    print(f"added (static): {lib}")
 
-    added = []
-    for lib in ADD_SHARED:
-        if re_line_present(src, lib):
-            print(f"already present: {lib}")
-            continue
-        src = src.replace(anchor, f"{anchor} \\\n        {lib}", 1)
-        added.append(lib)
-        print(f"added: {lib}")
-
-    # Add static libs to LOCAL_STATIC_LIBRARIES (FBE block).
-    anchor_static = "    LOCAL_STATIC_LIBRARIES += libvold libscrypt_static"
-    if anchor_static not in src:
-        print("error: LOCAL_STATIC_LIBRARIES anchor not found")
-        sys.exit(1)
-    for lib in ADD_STATIC:
-        if re_line_present(src, lib):
-            print(f"already present: {lib}")
-            continue
-        src = src.replace(anchor_static,
-                          f"{anchor_static} {lib}", 1)
-        added.append(lib)
-        print(f"added (static): {lib}")
-
-    with open(LIBTAR, "w") as f:
-        f.write(src)
-
-    if added:
-        print(f"patched: libtar link libs updated (+{len(added)})")
-    else:
-        print("patched: libtar link libs OK")
+        with open(f, "w") as fh:
+            fh.write(src)
+        print(f"patched: {f}")
 
 
 def re_line_present(src, name):
     # match a line that is exactly the module name with optional trailing '\'
-    import re
     return re.search(rf"^\s+{re.escape(name)}\s*\\?$", src, re.MULTILINE) is not None
 
 
