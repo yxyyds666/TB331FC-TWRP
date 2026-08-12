@@ -64,7 +64,7 @@ BOARD_HAS_LARGE_FILESYSTEM := true
 # Dynamic Partitions (from stock recovery.fstab: ext4 logical)
 BOARD_SUPER_PARTITION_SIZE := 9126805504
 BOARD_SUPER_PARTITION_GROUPS := lenovo_dynamic_partitions
-BOARD_LENOVO_DYNAMIC_PARTITIONS_PARTITION_LIST := system system_ext vendor vendor_dlkm system_dlkm odm product
+BOARD_LENOVO_DYNAMIC_PARTITIONS_PARTITION_LIST := system system_ext vendor vendor_dlkm odm product
 BOARD_LENOVO_DYNAMIC_PARTITIONS_SIZE := 9122611200
 
 # Filesystems

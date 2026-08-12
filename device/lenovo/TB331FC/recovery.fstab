@@ -16,7 +16,6 @@
 /system_ext            ext4    /dev/block/mapper/system_ext                                        flags=display="System_Ext";backup=1;slotselect;logical
 /vendor                ext4    /dev/block/mapper/vendor                                            flags=display="Vendor";backup=1;slotselect;logical
 /vendor_dlkm           ext4    /dev/block/mapper/vendor_dlkm                                       flags=display="Vendor_DLKM";backup=1;slotselect;logical
-/system_dlkm           ext4    /dev/block/mapper/system_dlkm                                       flags=display="System_DLKM";backup=1;slotselect;logical
 /odm                   ext4    /dev/block/mapper/odm                                               flags=display="ODM";backup=1;slotselect;logical
 /product               ext4    /dev/block/mapper/product                                           flags=display="Product";backup=1;slotselect;logical
 
