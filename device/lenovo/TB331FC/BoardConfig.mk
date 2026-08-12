@@ -124,6 +124,8 @@ BOARD_USES_QCOM_FBE_DECRYPTION  := true
 # Security patch level
 PLATFORM_SECURITY_PATCH := 2099-12-31
 VENDOR_SECURITY_PATCH := $(PLATFORM_SECURITY_PATCH)
+PLATFORM_VERSION := 99
+PLATFORM_VERSION_LAST_STABLE := $(PLATFORM_VERSION)
 
 # Verified Boot - recovery partition signed like TB321FU (testkey, low
 # rollback index). Stock TB331FC recovery_a.img has no AVB signature and no
