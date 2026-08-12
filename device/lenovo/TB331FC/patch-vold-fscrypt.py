@@ -46,6 +46,10 @@ def main():
     fetch(f"{TW_ORG}/android-12.1/fscrypt_policy.h", f"{VOLD}/fscrypt_policy.h")
     fetch(f"{TW_ORG}/android-12.1/fscrypt_policy.cpp", f"{VOLD}/fscrypt_policy.cpp")
 
+    # 1a. fscryptpolicyget.cpp (14.1) uses the old v1/v2 API; replace with
+    #     the android-12.1 version that uses the union API.
+    fetch(f"{TW_ORG}/android-12.1/fscryptpolicyget.cpp", f"{VOLD}/fscryptpolicyget.cpp")
+
     # 1b. android-14.1 removed android::vold::isFsKeyringSupported(); the 12.1
     #     fscrypt_policy_get_struct uses it. Drop the keyring branch and always
     #     use the EX ioctl like 14.1 does.
