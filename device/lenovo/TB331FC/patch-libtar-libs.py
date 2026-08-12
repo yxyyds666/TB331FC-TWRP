@@ -30,11 +30,17 @@ RENAMES = [
     ("android.security.maintenance-ndk_platform", "android.security.maintenance-ndk"),
 ]
 
-# Libraries libvold depends on but libtar does not link
+# Libraries libvold depends on but libtar does not link.
+# NOTE: vold_default_libs lists libasync_safe in static_libs (it is a static
+# lib, no libasync_safe.so exists); libsysutils and libboot_control_client are
+# in shared_libs.
 ADD_SHARED = [
     "libsysutils",
-    "libasync_safe",
     "libboot_control_client",
+]
+
+ADD_STATIC = [
+    "libasync_safe",
 ]
 
 
@@ -69,6 +75,20 @@ def main():
         added.append(lib)
         print(f"added: {lib}")
 
+    # Add static libs to LOCAL_STATIC_LIBRARIES (FBE block).
+    anchor_static = "    LOCAL_STATIC_LIBRARIES += libvold libscrypt_static"
+    if anchor_static not in src:
+        print("error: LOCAL_STATIC_LIBRARIES anchor not found")
+        sys.exit(1)
+    for lib in ADD_STATIC:
+        if re_line_present(src, lib):
+            print(f"already present: {lib}")
+            continue
+        src = src.replace(anchor_static,
+                          f"{anchor_static} {lib}", 1)
+        added.append(lib)
+        print(f"added (static): {lib}")
+
     with open(LIBTAR, "w") as f:
         f.write(src)
 
@@ -76,7 +96,6 @@ def main():
         print(f"patched: libtar link libs updated (+{len(added)})")
     else:
         print("patched: libtar link libs OK")
-    print("done")
 
 
 def re_line_present(src, name):
