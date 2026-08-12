@@ -3,10 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-# Inherit from these configurations
-$(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit_only.mk)
-$(call inherit-product, $(SRC_TARGET_DIR)/product/base.mk)
-
+# Inherit from these configurations (aligned with working TB321FU: no
+# core_64_bit_only/base.mk which reset PLATFORM_VERSION to 12)
 # Inherit from device configuration
 $(call inherit-product, device/lenovo/TB331FC/device.mk)
 

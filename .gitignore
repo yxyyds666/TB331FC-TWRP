@@ -3,3 +3,4 @@ device/lenovo/TB331FC/prebuilt/kernel
 
 # Ignore stock image dumps (large binaries, kept out of git)
 *.img
+.tmp/
