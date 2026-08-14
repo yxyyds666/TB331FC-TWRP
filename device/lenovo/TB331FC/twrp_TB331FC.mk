@@ -8,6 +8,11 @@
 # Inherit from device configuration
 $(call inherit-product, device/lenovo/TB331FC/device.mk)
 
+# Same arch flags as core_64_bit_only.mk, set explicitly so PLATFORM_VERSION
+# is not reset by inheriting that product
+TARGET_SUPPORTS_32_BIT_APPS := false
+TARGET_SUPPORTS_64_BIT_APPS := true
+
 # Inherit from TWRP common configuration
 $(call inherit-product, vendor/twrp/config/common.mk)
 
