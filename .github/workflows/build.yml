@@ -111,10 +111,12 @@ jobs:
           echo "Downloading: ${RELEASE_URL}"
           curl -L -o /tmp/boot-main.img "${RELEASE_URL}"
 
-      # Stock recovery_a.img contains NO kernel (GKI device, header v4). The
-      # bootloader injects the kernel from the boot partition, so recovery.img
-      # is built with an empty kernel (TARGET_PREBUILT_KERNEL=/dev/null) exactly
-      # like stock. The kernel is kept for reference/verification only.
+      # Stock recovery_a.img contains NO kernel and an EMPTY cmdline (GKI
+      # device, header v4). The bootloader injects the kernel from the boot
+      # partition, so recovery.img is built with
+      # BOARD_EXCLUDE_KERNEL_FROM_RECOVERY_IMAGE := true, which drops both the
+      # kernel and the buildvariant=eng cmdline that build/make would otherwise
+      # write into the header. The kernel is kept for reference only.
       - name: Extract kernel Image from boot-main.img
         run: |
           unpack_bootimg --boot_img /tmp/boot-main.img --out /tmp/boot_extract

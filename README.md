@@ -13,7 +13,7 @@ A TWRP device tree fused from two proven sources:
 
 The `twrp-12.1` minimal manifest is self-consistent — vold 12.1 still ships the fscrypt/cryptfs APIs that Android 14 removed, so **no source patches are required**.
 
-The device is GKI: stock `recovery_a.img` contains no kernel (empty Image). The bootloader loads the kernel from the boot partition; `TARGET_PREBUILT_KERNEL := /dev/null` reproduces this.
+The device is GKI: stock `recovery_a.img` contains no kernel (empty Image) and an empty cmdline. The bootloader loads the kernel from the boot partition; `BOARD_EXCLUDE_KERNEL_FROM_RECOVERY_IMAGE := true` reproduces this.
 
 ## Features
 

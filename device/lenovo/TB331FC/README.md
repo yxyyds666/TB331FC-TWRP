@@ -28,8 +28,10 @@ Fused from two proven sources:
    are needed**.
 
 The device is a GKI device: stock `recovery_a.img` contains **no kernel**
-(empty Image). The bootloader loads the kernel from the boot partition.
-`TARGET_PREBUILT_KERNEL := /dev/null` reproduces this exactly.
+(empty Image) and an **empty cmdline**. The bootloader loads the kernel from
+the boot partition. `BOARD_EXCLUDE_KERNEL_FROM_RECOVERY_IMAGE := true`
+reproduces this exactly (it also suppresses the `buildvariant=eng` cmdline
+that build/make would otherwise write into the recovery header).
 
 ## Build
 

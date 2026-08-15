@@ -43,8 +43,12 @@ BOARD_MKBOOTIMG_ARGS += --header_version $(BOARD_BOOT_HEADER_VERSION)
 BOARD_MKBOOTIMG_ARGS += --pagesize $(BOARD_KERNEL_PAGESIZE)
 
 # Stock recovery.img contains no kernel (GKI): bootloader loads it from boot.
-# Match stock layout exactly.
-TARGET_PREBUILT_KERNEL := /dev/null
+# Match stock layout exactly: exclude BOTH the kernel and the kernel cmdline
+# from the recovery image. TeamWin build/make android-12.1 unconditionally
+# appends "buildvariant=eng" to the recovery header cmdline unless this flag
+# is set; the working TB321FU image has an empty cmdline because of it, and
+# the Lenovo bootloader falls back to fastboot when the cmdline is non-empty.
+BOARD_EXCLUDE_KERNEL_FROM_RECOVERY_IMAGE := true
 
 # Use LZ4 Ramdisk compression (stock uses LZ4)
 BOARD_RAMDISK_USE_LZ4 := true
